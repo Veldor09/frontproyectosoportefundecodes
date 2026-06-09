@@ -1,0 +1,52 @@
+# Dependencias y artefactos — siempre se reconstruyen dentro del contenedor.
+node_modules
+.next
+.next/cache
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Variables locales de desarrollo (no entran al build de producción).
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Editor / OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Test / cobertura
+coverage
+.nyc_output
+
+# Documentación interna y artefactos de informes (no van al runtime).
+README.md
+DEPLOY_DOKPLOY.md
+INFORME_VERIFICACION_BUILDS.*
+estructuraFront.txt
+
+# Configs de despliegue alternas (Docker Compose nativo, certbot, nginx, PM2).
+# Dokploy no las necesita; aligeran el contexto de build enorme­mente.
+deploy
+
+# Build artefacts de TS
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Self
+Dockerfile
+.dockerignore

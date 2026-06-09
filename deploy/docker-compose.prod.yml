@@ -1,0 +1,127 @@
+# =============================================================
+#  Fundecodes Digital — Stack completo de producción
+#  Servicios: PostgreSQL · Backend NestJS · Frontend Next.js · Nginx
+#
+#  Uso:
+#   1. Copia este archivo al VPS en /opt/fundecodes/docker-compose.yml
+#   2. Copia .env.production de back y front como .env.back / .env.front
+#   3. Construye y arranca:
+#        docker compose --env-file .env.stack up -d --build
+# =============================================================
+
+name: fundecodes
+
+services:
+  # ---------------- PostgreSQL ----------------
+  db:
+    image: postgres:16-alpine
+    container_name: fundecodes-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    # No exponemos el puerto al host por defecto (solo red interna).
+    # Si necesitas conectar DBeaver/pgAdmin, descomenta temporalmente:
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend-net
+
+  # ---------------- Backend NestJS ----------------
+  backend:
+    build:
+      context: ../../backfundecodesdigital
+      dockerfile: Dockerfile
+    container_name: fundecodes-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - ./.env.back
+    environment:
+      # Sobrescribe DATABASE_URL para apuntar al servicio "db" (red interna).
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      NODE_ENV: production
+      PORT: 4000
+    volumes:
+      - uploads_data:/app/uploads
+    # Solo red interna — Nginx lo expone al exterior.
+    networks:
+      - backend-net
+      - web-net
+
+  # ---------------- Frontend Next.js ----------------
+  frontend:
+    build:
+      context: ../
+      dockerfile: Dockerfile
+      args:
+        # Debe bakearse en build time para el bundle de cliente.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    container_name: fundecodes-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    env_file:
+      - ./.env.front
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    networks:
+      - web-net
+
+  # ---------------- Nginx (reverse proxy + SSL) ----------------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: fundecodes-nginx
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - uploads_data:/var/www/uploads:ro
+    networks:
+      - web-net
+
+  # ---------------- Certbot (Let's Encrypt) ----------------
+  # Uso manual: docker compose run --rm certbot certonly ...
+  # Renueva con cron (ver guía de despliegue).
+  certbot:
+    image: certbot/certbot:latest
+    container_name: fundecodes-certbot
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+    entrypoint: ""
+    command: ["sh", "-c", "echo 'Ejecuta con: docker compose run --rm certbot ...'"]
+
+volumes:
+  db_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+networks:
+  # Red privada entre backend y db (no expuesta fuera).
+  backend-net:
+    driver: bridge
+  # Red entre nginx ↔ backend/frontend.
+  web-net:
+    driver: bridge
