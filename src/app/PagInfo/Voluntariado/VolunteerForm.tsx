@@ -2,6 +2,18 @@
 
 import { useState } from "react";
 import API from "@/services/api";
+
+const SIMULATE_URL = `${process.env.NEXT_PUBLIC_API_URL}/api/simulate/trigger`;
+
+async function triggerSimulation(type: 'error_rate' | 'memory' | 'latency') {
+  try {
+    await fetch(SIMULATE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type }),
+    });
+  } catch { /* fire-and-forget */ }
+}
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +44,7 @@ export default function VolunteerForm() {
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [simulationAlert, setSimulationAlert] = useState(false);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -100,6 +113,11 @@ export default function VolunteerForm() {
       setSuccessMessage(
         "Tu registro fue enviado correctamente. Pronto nos pondremos en contacto contigo."
       );
+
+      // 🟡 Dispara simulación de Alta Memoria Heap en background
+      triggerSimulation('memory');
+      setSimulationAlert(true);
+      setTimeout(() => setSimulationAlert(false), 8000);
 
       setFormData({
         fullname: "",
@@ -212,6 +230,18 @@ export default function VolunteerForm() {
       {successMessage ? (
         <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
           {successMessage}
+        </div>
+      ) : null}
+
+      {simulationAlert ? (
+        <div className="rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 flex items-start gap-2">
+          <span className="text-yellow-600 text-base flex-shrink-0">⚡</span>
+          <div>
+            <p className="text-yellow-800 font-semibold text-sm">Simulación de incidente activada</p>
+            <p className="text-yellow-700 text-xs mt-0.5">
+              Se está simulando <strong>uso elevado de memoria heap</strong>. Revisa Grafana en 2–3 minutos para ver la alerta <code>HighHeapMemoryUsage</code>.
+            </p>
+          </div>
         </div>
       ) : null}
 

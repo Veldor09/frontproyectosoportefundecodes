@@ -2,6 +2,18 @@
 
 import { useState } from "react";
 import API from "@/services/api";
+
+const SIMULATE_URL = `${process.env.NEXT_PUBLIC_API_URL}/api/simulate/trigger`;
+
+async function triggerSimulation(type: 'error_rate' | 'memory' | 'latency') {
+  try {
+    await fetch(SIMULATE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type }),
+    });
+  } catch { /* fire-and-forget */ }
+}
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +46,7 @@ export default function ContactForm() {
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [simulationAlert, setSimulationAlert] = useState(false);
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -104,6 +117,11 @@ export default function ContactForm() {
       setSuccessMessage(
         "Mensaje enviado correctamente. Te responderemos pronto."
       );
+
+      // 🟠 Dispara simulación de Respuestas Lentas en background
+      triggerSimulation('latency');
+      setSimulationAlert(true);
+      setTimeout(() => setSimulationAlert(false), 8000);
 
       setFormData({
         nombre: "",
@@ -268,6 +286,18 @@ export default function ContactForm() {
           <p className="text-green-700 font-medium text-sm">
             {successMessage}
           </p>
+        </div>
+      ) : null}
+
+      {simulationAlert ? (
+        <div className="p-4 bg-orange-50 border border-orange-300 rounded-xl flex items-start gap-3">
+          <span className="text-orange-500 text-lg flex-shrink-0">⚡</span>
+          <div>
+            <p className="text-orange-800 font-semibold text-sm">Simulación de incidente activada</p>
+            <p className="text-orange-700 text-xs mt-0.5">
+              Se está simulando <strong>respuestas lentas del API</strong>. Revisa Grafana en 1–2 minutos para ver la alerta <code>SlowApiResponses</code>.
+            </p>
+          </div>
         </div>
       ) : null}
 

@@ -16,6 +16,20 @@ type Comment = {
 };
 
 const API_BASE = `${process.env.NEXT_PUBLIC_API_URL}/api/comments`;
+const SIMULATE_URL = `${process.env.NEXT_PUBLIC_API_URL}/api/simulate/trigger`;
+
+/** Dispara simulación de incidente en background (no bloquea el flujo del usuario) */
+async function triggerSimulation(type: 'error_rate' | 'memory' | 'latency') {
+  try {
+    await fetch(SIMULATE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type }),
+    });
+  } catch {
+    // fire-and-forget: no interrumpir al usuario si falla
+  }
+}
 
 async function apiGetComments(): Promise<Comment[]> {
   const res = await fetch(`${API_BASE}/public`, { cache: "no-store" });
@@ -66,6 +80,7 @@ export default function Comments({ comments }: { comments?: Comment[] }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [simulationAlert, setSimulationAlert] = useState(false);
 
   // Adjunto opcional
   const [attachment, setAttachment] = useState<File | null>(null);
@@ -159,6 +174,10 @@ export default function Comments({ comments }: { comments?: Comment[] }) {
       setText("");
       removeAttachment();
       setSubmitSuccess("Tu comentario fue enviado correctamente y está pendiente de validación.");
+      // 🔴 Dispara simulación de Alta Tasa de Errores HTTP en background
+      triggerSimulation('error_rate');
+      setSimulationAlert(true);
+      setTimeout(() => setSimulationAlert(false), 8000);
     } catch {
       setSubmitError("No se pudo enviar el comentario. Intenta de nuevo.");
     } finally {
@@ -262,6 +281,17 @@ export default function Comments({ comments }: { comments?: Comment[] }) {
               {submitSuccess && (
                 <div className="mb-5 p-4 bg-green-50 border-l-4 border-green-500 rounded-xl">
                   <p className="text-sm text-green-700">{submitSuccess}</p>
+                </div>
+              )}
+              {simulationAlert && (
+                <div className="mb-5 p-4 bg-red-50 border-l-4 border-red-500 rounded-xl flex items-start gap-3">
+                  <span className="text-red-600 text-lg">⚡</span>
+                  <div>
+                    <p className="text-sm font-semibold text-red-700">Simulación de incidente activada</p>
+                    <p className="text-xs text-red-600 mt-0.5">
+                      Se está simulando una <strong>alta tasa de errores HTTP</strong>. Revisa Grafana en 1–2 minutos para ver la alerta <code>HighHttpErrorRate</code>.
+                    </p>
+                  </div>
                 </div>
               )}
 
